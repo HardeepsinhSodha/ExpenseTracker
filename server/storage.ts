@@ -17,6 +17,8 @@ import {
   type ExpenseWithCategory,
   type BudgetWithCategory
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
 
 export interface IStorage {
   // User methods
@@ -56,271 +58,254 @@ export interface IStorage {
   getMonthlyTrends(userId: number, months: number): Promise<{ month: string; total: number }[]>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private categories: Map<number, Category>;
-  private expenses: Map<number, Expense>;
-  private budgets: Map<number, Budget>;
-  private savingsGoals: Map<number, SavingsGoal>;
-  private currentUserId: number;
-  private currentCategoryId: number;
-  private currentExpenseId: number;
-  private currentBudgetId: number;
-  private currentSavingsGoalId: number;
+export class DatabaseStorage implements IStorage {
+  async initializeDefaultCategories() {
+    const existingCategories = await db.select().from(categories).limit(1);
+    if (existingCategories.length > 0) return; // Already initialized
 
-  constructor() {
-    this.users = new Map();
-    this.categories = new Map();
-    this.expenses = new Map();
-    this.budgets = new Map();
-    this.savingsGoals = new Map();
-    this.currentUserId = 1;
-    this.currentCategoryId = 1;
-    this.currentExpenseId = 1;
-    this.currentBudgetId = 1;
-    this.currentSavingsGoalId = 1;
-
-    // Initialize with default categories
-    this.initializeDefaultCategories();
-  }
-
-  private initializeDefaultCategories() {
     const defaultCategories = [
-      { name: "Food & Drinks", icon: "🍕", color: "#F44336" },
-      { name: "Transportation", icon: "🚗", color: "#2196F3" },
-      { name: "Shopping", icon: "🛍️", color: "#4CAF50" },
-      { name: "Entertainment", icon: "🎬", color: "#9C27B0" },
-      { name: "Health & Medical", icon: "🏥", color: "#FF9800" },
-      { name: "Utilities", icon: "💡", color: "#607D8B" },
-      { name: "Travel", icon: "✈️", color: "#FF5722" },
-      { name: "Education", icon: "📚", color: "#3F51B5" },
+      { name: "Food & Drinks", icon: "🍕", color: "#F44336", isCustom: false, userId: null },
+      { name: "Transportation", icon: "🚗", color: "#2196F3", isCustom: false, userId: null },
+      { name: "Shopping", icon: "🛍️", color: "#4CAF50", isCustom: false, userId: null },
+      { name: "Entertainment", icon: "🎬", color: "#9C27B0", isCustom: false, userId: null },
+      { name: "Health & Medical", icon: "🏥", color: "#FF9800", isCustom: false, userId: null },
+      { name: "Utilities", icon: "💡", color: "#607D8B", isCustom: false, userId: null },
+      { name: "Travel", icon: "✈️", color: "#FF5722", isCustom: false, userId: null },
+      { name: "Education", icon: "📚", color: "#3F51B5", isCustom: false, userId: null },
     ];
 
-    defaultCategories.forEach(cat => {
-      const category: Category = {
-        id: this.currentCategoryId++,
-        name: cat.name,
-        icon: cat.icon,
-        color: cat.color,
-        isCustom: false,
-        userId: null,
-      };
-      this.categories.set(category.id, category);
-    });
+    await db.insert(categories).values(defaultCategories);
   }
 
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
     return user;
   }
 
   async getCategories(userId: number): Promise<Category[]> {
-    return Array.from(this.categories.values()).filter(
-      cat => cat.userId === null || cat.userId === userId
-    );
+    await this.initializeDefaultCategories();
+    return await db.select().from(categories);
   }
 
   async createCategory(category: InsertCategory): Promise<Category> {
-    const id = this.currentCategoryId++;
-    const newCategory: Category = { 
-      ...category, 
-      id,
-      isCustom: category.isCustom ?? false,
-      userId: category.userId ?? null
-    };
-    this.categories.set(id, newCategory);
+    const [newCategory] = await db
+      .insert(categories)
+      .values(category)
+      .returning();
     return newCategory;
   }
 
   async updateCategory(id: number, category: Partial<InsertCategory>): Promise<Category | undefined> {
-    const existing = this.categories.get(id);
-    if (!existing) return undefined;
-    
-    const updated = { ...existing, ...category };
-    this.categories.set(id, updated);
-    return updated;
+    const [updated] = await db
+      .update(categories)
+      .set(category)
+      .where(eq(categories.id, id))
+      .returning();
+    return updated || undefined;
   }
 
   async deleteCategory(id: number): Promise<boolean> {
-    return this.categories.delete(id);
+    const result = await db.delete(categories).where(eq(categories.id, id));
+    return result.rowCount > 0;
   }
 
   async getExpenses(userId: number, limit?: number): Promise<ExpenseWithCategory[]> {
-    const userExpenses = Array.from(this.expenses.values())
-      .filter(expense => expense.userId === userId)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const query = db
+      .select()
+      .from(expenses)
+      .leftJoin(categories, eq(expenses.categoryId, categories.id))
+      .where(eq(expenses.userId, userId))
+      .orderBy(desc(expenses.date));
 
-    const limitedExpenses = limit ? userExpenses.slice(0, limit) : userExpenses;
-
-    return limitedExpenses.map(expense => ({
-      ...expense,
-      category: this.categories.get(expense.categoryId)!
+    const results = limit ? await query.limit(limit) : await query;
+    
+    return results.map(result => ({
+      ...result.expenses,
+      category: result.categories!
     }));
   }
 
   async getExpensesByDateRange(userId: number, startDate: Date, endDate: Date): Promise<ExpenseWithCategory[]> {
-    const userExpenses = Array.from(this.expenses.values())
-      .filter(expense => {
-        const expenseDate = new Date(expense.date);
-        return expense.userId === userId && 
-               expenseDate >= startDate && 
-               expenseDate <= endDate;
-      });
+    const results = await db
+      .select()
+      .from(expenses)
+      .leftJoin(categories, eq(expenses.categoryId, categories.id))
+      .where(
+        and(
+          eq(expenses.userId, userId),
+          gte(expenses.date, startDate),
+          lte(expenses.date, endDate)
+        )
+      );
 
-    return userExpenses.map(expense => ({
-      ...expense,
-      category: this.categories.get(expense.categoryId)!
+    return results.map(result => ({
+      ...result.expenses,
+      category: result.categories!
     }));
   }
 
   async getExpensesByCategory(userId: number, categoryId: number): Promise<ExpenseWithCategory[]> {
-    const userExpenses = Array.from(this.expenses.values())
-      .filter(expense => expense.userId === userId && expense.categoryId === categoryId);
+    const results = await db
+      .select()
+      .from(expenses)
+      .leftJoin(categories, eq(expenses.categoryId, categories.id))
+      .where(
+        and(
+          eq(expenses.userId, userId),
+          eq(expenses.categoryId, categoryId)
+        )
+      );
 
-    return userExpenses.map(expense => ({
-      ...expense,
-      category: this.categories.get(expense.categoryId)!
+    return results.map(result => ({
+      ...result.expenses,
+      category: result.categories!
     }));
   }
 
   async createExpense(expense: InsertExpense): Promise<Expense> {
-    const id = this.currentExpenseId++;
-    const newExpense: Expense = { 
-      ...expense, 
-      id,
-      notes: expense.notes ?? null,
-      isRecurring: expense.isRecurring ?? false,
-      createdAt: new Date()
-    };
-    this.expenses.set(id, newExpense);
+    const [newExpense] = await db
+      .insert(expenses)
+      .values(expense)
+      .returning();
     return newExpense;
   }
 
   async updateExpense(id: number, expense: Partial<InsertExpense>): Promise<Expense | undefined> {
-    const existing = this.expenses.get(id);
-    if (!existing) return undefined;
-    
-    const updated = { ...existing, ...expense };
-    this.expenses.set(id, updated);
-    return updated;
+    const [updated] = await db
+      .update(expenses)
+      .set(expense)
+      .where(eq(expenses.id, id))
+      .returning();
+    return updated || undefined;
   }
 
   async deleteExpense(id: number): Promise<boolean> {
-    return this.expenses.delete(id);
+    const result = await db.delete(expenses).where(eq(expenses.id, id));
+    return result.rowCount > 0;
   }
 
   async getBudgets(userId: number): Promise<BudgetWithCategory[]> {
-    const userBudgets = Array.from(this.budgets.values())
-      .filter(budget => budget.userId === userId);
+    const results = await db
+      .select()
+      .from(budgets)
+      .leftJoin(categories, eq(budgets.categoryId, categories.id))
+      .where(eq(budgets.userId, userId));
 
-    return userBudgets.map(budget => ({
-      ...budget,
-      category: budget.categoryId ? this.categories.get(budget.categoryId) : undefined
+    return results.map(result => ({
+      ...result.budgets,
+      category: result.categories || undefined
     }));
   }
 
   async createBudget(budget: InsertBudget): Promise<Budget> {
-    const id = this.currentBudgetId++;
-    const newBudget: Budget = { 
-      ...budget, 
-      id,
-      categoryId: budget.categoryId ?? null,
-      isOverall: budget.isOverall ?? false
-    };
-    this.budgets.set(id, newBudget);
+    const [newBudget] = await db
+      .insert(budgets)
+      .values(budget)
+      .returning();
     return newBudget;
   }
 
   async updateBudget(id: number, budget: Partial<InsertBudget>): Promise<Budget | undefined> {
-    const existing = this.budgets.get(id);
-    if (!existing) return undefined;
-    
-    const updated = { ...existing, ...budget };
-    this.budgets.set(id, updated);
-    return updated;
+    const [updated] = await db
+      .update(budgets)
+      .set(budget)
+      .where(eq(budgets.id, id))
+      .returning();
+    return updated || undefined;
   }
 
   async deleteBudget(id: number): Promise<boolean> {
-    return this.budgets.delete(id);
+    const result = await db.delete(budgets).where(eq(budgets.id, id));
+    return (result.rowCount || 0) > 0;
   }
 
   async getSavingsGoals(userId: number): Promise<SavingsGoal[]> {
-    return Array.from(this.savingsGoals.values())
-      .filter(goal => goal.userId === userId);
+    return await db.select().from(savingsGoals).where(eq(savingsGoals.userId, userId));
   }
 
   async createSavingsGoal(goal: InsertSavingsGoal): Promise<SavingsGoal> {
-    const id = this.currentSavingsGoalId++;
-    const newGoal: SavingsGoal = { 
-      ...goal, 
-      id,
-      currentAmount: goal.currentAmount ?? "0",
-      targetDate: goal.targetDate ?? null,
-      createdAt: new Date()
-    };
-    this.savingsGoals.set(id, newGoal);
+    const [newGoal] = await db
+      .insert(savingsGoals)
+      .values(goal)
+      .returning();
     return newGoal;
   }
 
   async updateSavingsGoal(id: number, goal: Partial<InsertSavingsGoal>): Promise<SavingsGoal | undefined> {
-    const existing = this.savingsGoals.get(id);
-    if (!existing) return undefined;
-    
-    const updated = { ...existing, ...goal };
-    this.savingsGoals.set(id, updated);
-    return updated;
+    const [updated] = await db
+      .update(savingsGoals)
+      .set(goal)
+      .where(eq(savingsGoals.id, id))
+      .returning();
+    return updated || undefined;
   }
 
   async deleteSavingsGoal(id: number): Promise<boolean> {
-    return this.savingsGoals.delete(id);
+    const result = await db.delete(savingsGoals).where(eq(savingsGoals.id, id));
+    return (result.rowCount || 0) > 0;
   }
 
   async getMonthlyExpenseTotal(userId: number, year: number, month: number): Promise<number> {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0);
     
-    const expenses = Array.from(this.expenses.values())
-      .filter(expense => {
-        const expenseDate = new Date(expense.date);
-        return expense.userId === userId && 
-               expenseDate >= startDate && 
-               expenseDate <= endDate;
-      });
+    const expenseResults = await db
+      .select()
+      .from(expenses)
+      .where(
+        and(
+          eq(expenses.userId, userId),
+          gte(expenses.date, startDate),
+          lte(expenses.date, endDate)
+        )
+      );
 
-    return expenses.reduce((total, expense) => total + parseFloat(expense.amount), 0);
+    return expenseResults.reduce((total, expense) => total + parseFloat(expense.amount), 0);
   }
 
   async getCategoryExpenseTotals(userId: number, startDate: Date, endDate: Date): Promise<{ categoryId: number; categoryName: string; total: number }[]> {
-    const expenses = Array.from(this.expenses.values())
-      .filter(expense => {
-        const expenseDate = new Date(expense.date);
-        return expense.userId === userId && 
-               expenseDate >= startDate && 
-               expenseDate <= endDate;
-      });
+    const results = await db
+      .select()
+      .from(expenses)
+      .leftJoin(categories, eq(expenses.categoryId, categories.id))
+      .where(
+        and(
+          eq(expenses.userId, userId),
+          gte(expenses.date, startDate),
+          lte(expenses.date, endDate)
+        )
+      );
 
-    const categoryTotals = new Map<number, number>();
-    expenses.forEach(expense => {
-      const current = categoryTotals.get(expense.categoryId) || 0;
-      categoryTotals.set(expense.categoryId, current + parseFloat(expense.amount));
+    const categoryTotals = new Map<number, { name: string; total: number }>();
+    results.forEach(result => {
+      const expense = result.expenses;
+      const category = result.categories;
+      if (category) {
+        const current = categoryTotals.get(expense.categoryId) || { name: category.name, total: 0 };
+        categoryTotals.set(expense.categoryId, {
+          name: category.name,
+          total: current.total + parseFloat(expense.amount)
+        });
+      }
     });
 
-    return Array.from(categoryTotals.entries()).map(([categoryId, total]) => ({
+    return Array.from(categoryTotals.entries()).map(([categoryId, data]) => ({
       categoryId,
-      categoryName: this.categories.get(categoryId)?.name || 'Unknown',
-      total
+      categoryName: data.name,
+      total: data.total
     }));
   }
 
@@ -342,4 +327,4 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
