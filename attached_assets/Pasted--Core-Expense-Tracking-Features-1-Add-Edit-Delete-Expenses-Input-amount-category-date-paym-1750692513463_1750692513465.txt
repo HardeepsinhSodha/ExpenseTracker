@@ -1,0 +1,100 @@
+🔹 Core Expense Tracking Features
+1. Add / Edit / Delete Expenses
+Input amount, category, date, payment mode, and optional notes.
+
+Attach receipts or images.
+
+Support for recurring expenses (e.g., subscriptions).
+
+2. Expense Categories
+Predefined: Food, Travel, Utilities, Shopping, Health, etc.
+
+Ability to create custom categories and subcategories.
+
+Color-coded or icon-tagged for visual distinction.
+
+3. Daily / Weekly / Monthly Summaries
+At-a-glance overview with bar/pie charts.
+
+Filter by date range, category, or payment mode.
+
+4. Multi-Currency Support
+Set preferred currency.
+
+Currency conversion when traveling (with exchange rate tracking).
+
+🔹 Budgeting & Financial Planning
+5. Set Budgets
+Monthly budget by category or overall.
+
+Alerts when nearing budget limits.
+
+6. Saving Goals
+Define goals (e.g., "Save ₹50,000 in 6 months").
+
+Track progress and remaining balance.
+
+7. Insights & Trends
+Identify top spending areas.
+
+Compare month-on-month changes.
+
+AI-generated tips (e.g., “Spending on dining increased 20% this month”).
+
+🔹 User Experience & Usability
+8. Search & Filters
+Filter by keyword, category, date, payment method, or amount range.
+
+Full-text search of notes/descriptions.
+
+9. Dark Mode
+For both web and mobile, with auto-switch based on system settings.
+
+10. Offline Mode (Mobile)
+Queue expenses offline and sync when online.
+
+🔹 Account & Security
+11. User Accounts & Sync
+Sign up via email/social accounts.
+
+Cloud sync across devices.
+
+12. Data Backup / Restore
+Periodic backup to cloud storage (Google Drive, iCloud).
+
+Manual export to CSV/Excel.
+
+13. Biometric Login (Mobile)
+Face ID / fingerprint support for quick access.
+
+14. End-to-End Encryption
+Secure expense and personal data.
+
+🔹 Collaboration & Shared Tracking
+15. Shared Expense Groups
+For roommates, couples, or friends.
+
+Track who paid what and settle balances.
+
+16. Split Bills
+Equal or custom split with others.
+
+Track repayments and dues.
+
+🔹 Notifications & Automation
+17. Smart Reminders
+Remind to log daily expenses.
+
+Notify on recurring expenses and nearing budget limits.
+
+18. Bank SMS/Email Parsing (Optional)
+Auto-detect expenses from SMS or email (opt-in only).
+
+Requires robust privacy and permission handling.
+
+🔹 Reports & Exporting
+19. Downloadable Reports
+Export monthly or custom reports in PDF/CSV formats.
+
+20. Tax-ready Tagging
+Mark expenses as “Tax-Deductible” for year-end review.
