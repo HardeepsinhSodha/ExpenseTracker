@@ -134,7 +134,12 @@ export class MemStorage implements IStorage {
 
   async createCategory(category: InsertCategory): Promise<Category> {
     const id = this.currentCategoryId++;
-    const newCategory: Category = { ...category, id };
+    const newCategory: Category = { 
+      ...category, 
+      id,
+      isCustom: category.isCustom ?? false,
+      userId: category.userId ?? null
+    };
     this.categories.set(id, newCategory);
     return newCategory;
   }
@@ -195,6 +200,8 @@ export class MemStorage implements IStorage {
     const newExpense: Expense = { 
       ...expense, 
       id,
+      notes: expense.notes ?? null,
+      isRecurring: expense.isRecurring ?? false,
       createdAt: new Date()
     };
     this.expenses.set(id, newExpense);
@@ -226,7 +233,12 @@ export class MemStorage implements IStorage {
 
   async createBudget(budget: InsertBudget): Promise<Budget> {
     const id = this.currentBudgetId++;
-    const newBudget: Budget = { ...budget, id };
+    const newBudget: Budget = { 
+      ...budget, 
+      id,
+      categoryId: budget.categoryId ?? null,
+      isOverall: budget.isOverall ?? false
+    };
     this.budgets.set(id, newBudget);
     return newBudget;
   }
@@ -254,6 +266,8 @@ export class MemStorage implements IStorage {
     const newGoal: SavingsGoal = { 
       ...goal, 
       id,
+      currentAmount: goal.currentAmount ?? "0",
+      targetDate: goal.targetDate ?? null,
       createdAt: new Date()
     };
     this.savingsGoals.set(id, newGoal);

@@ -35,10 +35,14 @@ export function ChartsSection() {
   });
 
   const { data: categoryTotals, isLoading: categoryLoading } = useQuery<CategoryTotal[]>({
-    queryKey: ['/api/analytics/category-totals', {
-      startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(),
-      endDate: new Date().toISOString(),
-    }],
+    queryKey: ['/api/analytics/category-totals'],
+    queryFn: async () => {
+      const startDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+      const endDate = new Date().toISOString().split('T')[0];
+      const response = await fetch(`/api/analytics/category-totals?startDate=${startDate}&endDate=${endDate}`);
+      if (!response.ok) throw new Error('Failed to fetch category totals');
+      return response.json();
+    },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 

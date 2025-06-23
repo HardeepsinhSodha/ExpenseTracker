@@ -246,7 +246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get savings goals
       const savingsGoals = await storage.getSavingsGoals(MOCK_USER_ID);
       const totalSavingsProgress = savingsGoals.reduce((total, goal) => 
-        total + parseFloat(goal.currentAmount), 0
+        total + parseFloat(goal.currentAmount ?? "0"), 0
       );
       
       res.json({
