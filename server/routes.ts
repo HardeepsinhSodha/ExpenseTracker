@@ -8,27 +8,35 @@ import {
   insertSavingsGoalSchema 
 } from "@shared/schema";
 import { z } from "zod";
+import { setupAuth } from "./replitAuth";
 
-// Mock user ID for development - in production this would come from authentication
-const MOCK_USER_ID = 1;
+// Middleware to check authentication
+const requireAuth = (req: Request, res: Response, next: any) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  next();
+};
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup authentication
+  setupAuth(app);
   
   // Categories routes
-  app.get("/api/categories", async (req: Request, res: Response) => {
+  app.get("/api/categories", requireAuth, async (req: Request, res: Response) => {
     try {
-      const categories = await storage.getCategories(MOCK_USER_ID);
+      const categories = await storage.getCategories(req.user!.id);
       res.json(categories);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch categories" });
     }
   });
 
-  app.post("/api/categories", async (req: Request, res: Response) => {
+  app.post("/api/categories", requireAuth, async (req: Request, res: Response) => {
     try {
       const categoryData = insertCategorySchema.parse({
         ...req.body,
-        userId: MOCK_USER_ID
+        userId: req.user!.id
       });
       const category = await storage.createCategory(categoryData);
       res.status(201).json(category);
@@ -42,17 +50,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Expenses routes
-  app.get("/api/expenses", async (req: Request, res: Response) => {
+  app.get("/api/expenses", requireAuth, async (req: Request, res: Response) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
-      const expenses = await storage.getExpenses(MOCK_USER_ID, limit);
+      const expenses = await storage.getExpenses(req.user!.id, limit);
       res.json(expenses);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch expenses" });
     }
   });
 
-  app.get("/api/expenses/date-range", async (req: Request, res: Response) => {
+  app.get("/api/expenses/date-range", requireAuth, async (req: Request, res: Response) => {
     try {
       const { startDate, endDate } = req.query;
       if (!startDate || !endDate) {
@@ -60,7 +68,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const expenses = await storage.getExpensesByDateRange(
-        MOCK_USER_ID,
+        req.user!.id,
         new Date(startDate as string),
         new Date(endDate as string)
       );
@@ -70,11 +78,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/expenses", async (req: Request, res: Response) => {
+  app.post("/api/expenses", requireAuth, async (req: Request, res: Response) => {
     try {
       const expenseData = insertExpenseSchema.parse({
         ...req.body,
-        userId: MOCK_USER_ID
+        userId: req.user!.id
       });
       const expense = await storage.createExpense(expenseData);
       res.status(201).json(expense);
@@ -87,7 +95,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/expenses/:id", async (req: Request, res: Response) => {
+  app.put("/api/expenses/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       const expenseData = insertExpenseSchema.partial().parse(req.body);
@@ -107,7 +115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/expenses/:id", async (req: Request, res: Response) => {
+  app.delete("/api/expenses/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteExpense(id);
@@ -123,20 +131,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Budgets routes
-  app.get("/api/budgets", async (req: Request, res: Response) => {
+  app.get("/api/budgets", requireAuth, async (req: Request, res: Response) => {
     try {
-      const budgets = await storage.getBudgets(MOCK_USER_ID);
+      const budgets = await storage.getBudgets(req.user!.id);
       res.json(budgets);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch budgets" });
     }
   });
 
-  app.post("/api/budgets", async (req: Request, res: Response) => {
+  app.post("/api/budgets", requireAuth, async (req: Request, res: Response) => {
     try {
       const budgetData = insertBudgetSchema.parse({
         ...req.body,
-        userId: MOCK_USER_ID
+        userId: req.user!.id
       });
       const budget = await storage.createBudget(budgetData);
       res.status(201).json(budget);
@@ -150,20 +158,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Savings goals routes
-  app.get("/api/savings-goals", async (req: Request, res: Response) => {
+  app.get("/api/savings-goals", requireAuth, async (req: Request, res: Response) => {
     try {
-      const goals = await storage.getSavingsGoals(MOCK_USER_ID);
+      const goals = await storage.getSavingsGoals(req.user!.id);
       res.json(goals);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch savings goals" });
     }
   });
 
-  app.post("/api/savings-goals", async (req: Request, res: Response) => {
+  app.post("/api/savings-goals", requireAuth, async (req: Request, res: Response) => {
     try {
       const goalData = insertSavingsGoalSchema.parse({
         ...req.body,
-        userId: MOCK_USER_ID
+        userId: req.user!.id
       });
       const goal = await storage.createSavingsGoal(goalData);
       res.status(201).json(goal);
@@ -177,7 +185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Analytics routes
-  app.get("/api/analytics/monthly-total", async (req: Request, res: Response) => {
+  app.get("/api/analytics/monthly-total", requireAuth, async (req: Request, res: Response) => {
     try {
       const { year, month } = req.query;
       if (!year || !month) {
@@ -185,7 +193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const total = await storage.getMonthlyExpenseTotal(
-        MOCK_USER_ID,
+        req.user!.id,
         parseInt(year as string),
         parseInt(month as string)
       );
@@ -195,7 +203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/analytics/category-totals", async (req: Request, res: Response) => {
+  app.get("/api/analytics/category-totals", requireAuth, async (req: Request, res: Response) => {
     try {
       const { startDate, endDate } = req.query;
       if (!startDate || !endDate) {
@@ -203,7 +211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const totals = await storage.getCategoryExpenseTotals(
-        MOCK_USER_ID,
+        req.user!.id,
         new Date(startDate as string),
         new Date(endDate as string)
       );
@@ -213,10 +221,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/analytics/monthly-trends", async (req: Request, res: Response) => {
+  app.get("/api/analytics/monthly-trends", requireAuth, async (req: Request, res: Response) => {
     try {
       const months = req.query.months ? parseInt(req.query.months as string) : 6;
-      const trends = await storage.getMonthlyTrends(MOCK_USER_ID, months);
+      const trends = await storage.getMonthlyTrends(req.user!.id, months);
       res.json(trends);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch monthly trends" });
@@ -224,27 +232,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard stats
-  app.get("/api/dashboard/stats", async (req: Request, res: Response) => {
+  app.get("/api/dashboard/stats", requireAuth, async (req: Request, res: Response) => {
     try {
       const currentDate = new Date();
       const currentMonth = currentDate.getMonth() + 1;
       const currentYear = currentDate.getFullYear();
       
       // Get current month total
-      const monthlyTotal = await storage.getMonthlyExpenseTotal(MOCK_USER_ID, currentYear, currentMonth);
+      const monthlyTotal = await storage.getMonthlyExpenseTotal(req.user!.id, currentYear, currentMonth);
       
       // Get budgets
-      const budgets = await storage.getBudgets(MOCK_USER_ID);
+      const budgets = await storage.getBudgets(req.user!.id);
       const overallBudget = budgets.find(b => b.isOverall);
       const budgetAmount = overallBudget ? parseFloat(overallBudget.amount) : 5000;
       const budgetRemaining = budgetAmount - monthlyTotal;
       
       // Get categories count
-      const categories = await storage.getCategories(MOCK_USER_ID);
+      const categories = await storage.getCategories(req.user!.id);
       const categoriesCount = categories.length;
       
       // Get savings goals
-      const savingsGoals = await storage.getSavingsGoals(MOCK_USER_ID);
+      const savingsGoals = await storage.getSavingsGoals(req.user!.id);
       const totalSavingsProgress = savingsGoals.reduce((total, goal) => 
         total + parseFloat(goal.currentAmount ?? "0"), 0
       );

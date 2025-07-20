@@ -1,12 +1,14 @@
 import { Link, useLocation } from 'wouter';
 import { useThemeStore } from '@/stores/useThemeStore';
+import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
-  DropdownMenuTrigger 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator 
 } from '@/components/ui/dropdown-menu';
 import { 
   Sheet, 
@@ -21,12 +23,16 @@ import {
   BarChart, 
   Moon, 
   Sun, 
-  Menu 
+  Menu,
+  User,
+  LogOut,
+  Loader2
 } from 'lucide-react';
 
 export function Navbar() {
   const [location] = useLocation();
   const { theme, toggleTheme, isDark } = useThemeStore();
+  const { user, logoutMutation } = useAuth();
 
   const navigationItems = [
     { href: '/', label: 'Dashboard', icon: PieChart },
@@ -96,15 +102,35 @@ export function Navbar() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-2">
                   <Avatar className="h-8 w-8">
-                    <AvatarFallback>JD</AvatarFallback>
+                    <AvatarFallback>
+                      {user?.username?.charAt(0).toUpperCase() || 'U'}
+                    </AvatarFallback>
                   </Avatar>
-                  <span className="hidden md:block text-sm font-medium">John Doe</span>
+                  <span className="hidden md:block text-sm font-medium">
+                    {user?.username || 'User'}
+                  </span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem>Profile</DropdownMenuItem>
-                <DropdownMenuItem>Settings</DropdownMenuItem>
-                <DropdownMenuItem>Logout</DropdownMenuItem>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem className="flex items-center space-x-2">
+                  <User className="h-4 w-4" />
+                  <span>Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  className="flex items-center space-x-2 text-red-600 dark:text-red-400"
+                  onClick={() => logoutMutation.mutate()}
+                  disabled={logoutMutation.isPending}
+                >
+                  {logoutMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <LogOut className="h-4 w-4" />
+                  )}
+                  <span>
+                    {logoutMutation.isPending ? 'Logging out...' : 'Logout'}
+                  </span>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
